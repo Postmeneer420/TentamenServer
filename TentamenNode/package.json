@@ -1,0 +1,30 @@
+{
+  "name": "tentamennode",
+  "version": "1.0.0",
+  "description": "De server voor het tentamen",
+  "main": "server.js",
+  "dependencies": {
+    "body-parser": "^1.17.2",
+    "express": "^4.15.3",
+    "express-jwt": "^5.3.0",
+    "jwt-simple": "^0.5.1",
+    "moment": "^2.18.1",
+    "morgan": "^1.8.2",
+    "mysql": "^2.13.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JKannekens/Programmeren4Tentamen.git"
+  },
+  "bugs": {
+    "url": "https://github.com/JKannekens/Programmeren4Tentamen/issues"
+  },
+  "homepage": "https://github.com/JKannekens/Programmeren4Tentamen#readme"
+}
