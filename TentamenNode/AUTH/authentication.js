@@ -11,7 +11,7 @@ const jwt = require('jwt-simple');
 //
 function encodeToken(username) {
     const playload = {
-        exp: moment().add(2, 'days').unix(),
+        exp: moment().add(60, 'minutes').unix(),
         iat: moment().unix(),
         sub: username
     };
@@ -37,7 +37,7 @@ function decodeToken(token, cb) {
         // Return
         cb(null, payload);
 
-    } catch (err) {
+    } catch(err) {
         cb(err, null);
     }
 }
