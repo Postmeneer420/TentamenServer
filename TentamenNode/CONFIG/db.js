@@ -3,19 +3,26 @@
 //
 // Configuratiebestand voor MySql database.
 //
-// var mysql = require('mysql');
-
 var mysql = require('mysql');
 var config = require('../config/config');
 
-var pool2 = mysql.createPool({
-    multipleStatements:true,
-    connectionLimit : 25,
-    host : config.dbHost,
-    user : config.dbUser,
-    password : config.dbPassword,
-    database : config.dbDatabase
+var connectionSettings = {
+    host: process.env.DB_HOST || config.dbHost,
+    user: process.env.DB_USER || config.dbUser,
+    password: process.env.DB_PASSWORD || config.dbPassword,
+    database: process.env.DB_DATABASE || config.dbDatabase,
+    debug: false
+}
 
+var connection = mysql.createConnection(connectionSettings);
+
+connection.connect(function(error) {
+    if (error) {
+        console.error("Error connecting to database " + connectionSettings.database + " on " + connectionSettings.host + ": " + error.message);
+        return;
+    } else {
+        console.log("Connected to database " + connectionSettings.database + " on " + connectionSettings.host);
+    }
 });
 
-module.exports = pool2;
+module.exports = connection;
