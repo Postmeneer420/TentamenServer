@@ -148,12 +148,12 @@ router.get('/films/:filmid?', function(request, response, next) {
     }
 });
 
-router.get('/rentals/:userid', function(request, response, next) {
-    var userid = request.params.userid;
+router.get('/rentals/:rentalid', function(request, response, next) {
+    var rentalid = request.params.rentalid;
     var query_str;
 
-    if (userid > 0) {
-        query_str = 'SELECT title FROM film INNER JOIN inventory ON film.film_id = inventory.film_id INNER JOIN rental ON inventory.inventory_id = rental.inventory_id INNER JOIN customer ON rental.customer_id = customer.customer_id WHERE customer.customer_id = "' + userid + '";';
+    if (rentalid > 0) {
+        query_str = 'SELECT * FROM `1069`.rental WHERE rental_id = "' + rentalid + '";';
 
         pool.getConnection(function (error, connection) {
             if (error) {

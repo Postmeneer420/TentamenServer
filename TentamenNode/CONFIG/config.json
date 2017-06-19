@@ -1,9 +1,9 @@
 {
     "secretkey":  "SuperGeheimeKey",
-    "webPort": "3306",
+    "webPort": "3012",
     "dbHost": "146.185.130.82",
-    "dbUsername": "1055",
-    "dbPassword": "sita155",
-    "dbDatabase": "1055",
-    "dbDatabaseUser": "1055"
+    "dbUsername": "1069",
+    "dbPassword": "secret",
+    "dbDatabase": "1069",
+    "dbDatabaseUser": "1069"
 }
