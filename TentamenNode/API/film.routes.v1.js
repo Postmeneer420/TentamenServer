@@ -24,19 +24,29 @@ routes.get('/films', function (req, res) {
 //
 // Geeft een specifieke film.
 //
-routes.get('/films/:filmid', function(req, res) {
+routes.get('/films/:filmid?', function(request, response, next) {
+    var filmid = request.params.filmid;
+    var query_str;
 
-    var filmsId = req.params.id;
+    if (filmid > 0) {
+        query_str = 'SELECT * FROM `1069`.film WHERE film_id = "' + filmid + '";';
 
-    res.contentType('application/json');
-
-    db.query('SELECT * FROM film WHERE film_id=?', [filmsId], function(error, rows, fields) {
-        if (error) {
-            res.status(401).json(error);
-        } else {
-            res.status(200).json({ result: rows });
-        };
-    });
+        pool.getConnection(function (error, connection) {
+            if (error) {
+                throw error
+            }
+            connection.query(query_str, function (error, rows, fields) {
+                connection.release();
+                if (error) {
+                    throw error
+                }
+                response.status(200).json(rows);
+            });
+        });
+    } else {
+        next();
+        return;
+    }
 });
 
 //
