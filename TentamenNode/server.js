@@ -1,7 +1,7 @@
 var express = require('express');
 var bodyParser = require('body-parser')
 var logger = require('morgan');
-var config = require('./config.json');
+var config = require('./CONFIG/config.json');
 
 // applicatie aanmaken
 var app = express();
@@ -9,13 +9,12 @@ app.use(bodyParser.urlencoded({ 'extended':'true'}))
 app.use(bodyParser.json());
 app.use(bodyParser.json({ type: 'application/vnd.api+json' }));
 
-
 app.all('*', function(request, response, next){
     console.log(request.method + " " + request.url);
     next();
 })
 
-app.use('/api/v1', require('./routes/routes_api_v1'));
+app.use('/api/v1', require('./API/film.routes.v1'));
 
 
 app.set('PORT', config.webPort);

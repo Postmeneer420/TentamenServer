@@ -1,30 +1,129 @@
-/**
- * Created by Justin on 15-6-2017.
- */
 var express = require('express');
-var routes = express.Router();
-var db = require('../config/db');
+var router = express.Router();
+var pool = require('../CONFIG/db');
 
-//
-// Geeft een lijst van alle films.
-//
-// offset en count nog toevoegen aan deze
-routes.get('/films', function (req, res) {
-    res.contentType('application/json');
+var auth =  require('../auth/authentication');
+var bcrypt = require('bcrypt');
 
-    db.query('SELECT * FROM film', function (error, rows, fields) {
-        if (error) {
-            res.status(401).json(error);
+router.all( new RegExp("[^(\/login|\/register)]"), function (req, res, next) {
+
+    console.log("VALIDATE TOKEN")
+
+    var token = (req.header('Token')) || '';
+
+    auth.decodeToken(token, function (err, payload) {
+        if (err) {
+            console.log('Error handler: ' + err.message);
+            res.status((err.status || 401 )).json({error: new Error("Not authorised").message});
         } else {
-            res.status(200).json({ result: rows });
-        };
+            next();
+        }
     });
 });
 
-//
-// Geeft een specifieke film.
-//
-routes.get('/films/:filmid?', function(request, response, next) {
+router.post('/login', function(req, res) {
+
+    var username = req.body.username || '';
+    var password = req.body.password || '';
+
+    if (username != '' && password != '') {
+        var query_str = {
+            sql: query_str = 'SELECT password FROM customer WHERE username=?',
+            values: [username],
+            timeout: 2000
+        }
+
+        pool.getConnection(function (error, connection) {
+            if (error) {
+                throw error
+            }
+            connection.query(query_str, function (error, result, fields) {
+                connection.release();
+                if (error) {
+                    throw error
+                }
+
+                if (result.length > 0) {
+                    bcrypt.compare(password, result[0].password, function (err, response) {
+                        if (response === true) {
+                            console.log("Correct ingevoerd password");
+                            res.status(200).json({"token": auth.encodeToken(username), "username": username});
+                        } else {
+                            res.status(401).json({"error": "Invalid credentials, bye"})
+                        }
+                    });
+                } else {
+                    res.status(401).json({"error": "Invalid credentials, bye"})
+                }
+            });
+        });
+    }
+});
+
+router.post('/register', function(req, res) {
+
+    var username = req.body.username || '';
+    var password = req.body.password || '';
+
+    if (username != '' && password != '') {
+        var hash = bcrypt.hashSync(password, 10);
+        var query_str = {
+            sql: 'INSERT INTO `customer` (username, password) VALUES (?, ?)',
+            values: [username, hash],
+            timeout: 2000 // 2secs
+        };
+
+        pool.getConnection(function (error, connection) {
+            if (error) {
+                throw error
+            }
+            connection.query(query_str, function (error, rows, fields) {
+                connection.release();
+                if (error) {
+                    if (error.code === 'ER_DUP_ENTRY') {
+                        res.status(200).json({"Error": "Deze gebruiker bestaat al"});
+                        return;
+                    } else {
+                        throw error
+                    }
+                }
+                console.log("Gebruiker aangemaakt in database");
+                console.log("Password opgeslagen als hash in database");
+
+                // Generate JWT
+                res.status(200).json({"token": auth.encodeToken(username), "username": username});
+            });
+        });
+    };
+});
+
+router.get('/films/:number&:count', function(request, response) {
+    var count = request.params.count;
+    var number = request.params.number;
+    var query_str = {
+        sql: query_str = 'SELECT * FROM film ORDER BY title LIMIT ' + count + ',' + number,
+        values: [],
+        timeout: 2000
+    }
+    console.log('Query: ' + query_str.sql + query_str.values + "\n");
+
+    response.contentType('application/json');
+
+    pool.getConnection(function (error, connection) {
+        if (error) {
+            throw error
+        }
+        connection.query(query_str, function (error, rows, fields) {
+            connection.release();
+            if (error) {
+                throw error
+            }
+            response.status(200).json(rows);
+        });
+    });
+});
+
+router.get('/films/:filmid?', function(request, response, next) {
     var filmid = request.params.filmid;
     var query_str;
 
@@ -49,105 +148,113 @@ routes.get('/films/:filmid?', function(request, response, next) {
     }
 });
 
-//
-// Geeft een specifieke rental.
-//
-routes.get('/rentals/:userid', function(req, res) {
+router.get('/rentals/:userid', function(request, response, next) {
+    var userid = request.params.userid;
+    var query_str;
 
-    var rentalId = req.params.id;
+    if (userid > 0) {
+        query_str = 'SELECT title FROM film INNER JOIN inventory ON film.film_id = inventory.film_id INNER JOIN rental ON inventory.inventory_id = rental.inventory_id INNER JOIN customer ON rental.customer_id = customer.customer_id WHERE customer.customer_id = "' + userid + '";';
 
-    res.contentType('application/json');
-
-    db.query('SELECT * FROM rental WHERE rental_id=?', [rentalId], function(error, rows, fields) {
-        if (error) {
-            res.status(401).json(error);
-        } else {
-            res.status(200).json({ result: rows });
-        };
-    });
+        pool.getConnection(function (error, connection) {
+            if (error) {
+                throw error
+            }
+            connection.query(query_str, function (error, rows, fields) {
+                connection.release();
+                if (error) {
+                    throw error
+                }
+                response.status(200).json(rows);
+            });
+        });
+    } else {
+        next();
+        return;
+    }
 });
 
-//
-// Maakt een nieuwe uitlening voor de gegeven
-// gebruiker van het exemplaar met
-// gegeven inventoryid.
-//
-routes.post('/rentals/:userid/:inventoryid', function(req, res) {
-
-    var rentals = req.body;
-    var query = {
-        sql: 'INSERT INTO `rental`(`rental_id`, `customer_id`) VALUES (?, ?)',
-        values: [rentals.rental_id, rentals.customer_id],
-        timeout: 2000 // 2secs
+router.post('/rentals/:customer_id/:inventory_id', function(request, response) {
+    console.log('test rental.');
+    var rental = request.body;
+    console.log(rental.inventory_id);
+    var query_str = {
+        sql: 'INSERT INTO `rental` (customer_id, inventory_id) VALUES (?, ?)',
+        values : [rental.customer_id, rental.inventory_id],
+        timeout : 20000 // 2secs
     };
 
-    console.dir(rentals);
-    console.log('Onze query: ' + query.sql);
+    console.dir(rental);
+    console.log('Query: ' + query_str.sql + "\n" + query_str.values);
 
-    res.contentType('application/json');
-    db.query(query, function(error, rows, fields) {
+    response.contentType('application/json');
+
+    pool.getConnection(function (error, connection) {
         if (error) {
-            res.status(401).json(error);
-        } else {
-            res.status(200).json({ result: rows });
-        };
+            throw error
+        }
+        connection.query(query_str, function (error, rows, fields) {
+            connection.release();
+            if (error) {
+                throw error
+            }
+            response.status(200).json(rows);
+        });
     });
 });
 
-//
-// Wijzig bestaande uitlening voor de gegeven
-// gebruiker van het exemplaar met
-// gegeven inventoryid.
-//
-routes.put('/rentals/:userid/:inventoryid ', function(req, res) {
+router.put('/rentals/:inventory_id', function(request, response) {
 
-    var rentals = req.body;
-    var userid = req.params.id;
-    var inventoryid = req.params.id;
-    var query = {
-        sql: 'UPDATE `rental` SET userid=? WHERE userid=? AND inventoryid=?',
-        values: [rentals.userid, userid, inventoryid],
-        timeout: 2000 // 2secs
+    var rental = request.body;
+    var inventory_id = request.body;
+    var query_str = {
+        sql:
+        // 'UPDATE `country` SET name=? WHERE code=?',
+            'UPDATE rental SET inventory_id=? WHERE inventory_id =1 AND customer_id=?',
+        values : [ rental.customer_id, rental.inventory_id ],
+        timeout : 2000
     };
 
-    console.dir(rentals);
-    console.log('Onze query: ' + query.sql);
+    console.log('Query: ' + query_str.sql + "\n" + query_str.values + "\n");
 
-    res.contentType('application/json');
-    db.query(query, function(error, rows, fields) {
+    response.contentType('application/json');
+
+    pool.getConnection(function (error, connection) {
         if (error) {
-            res.status(401).json(error);
-        } else {
-            res.status(200).json({ result: rows });
-        };
+            throw error
+        }
+        connection.query(query_str, function (error, rows, fields) {
+            connection.release();
+            if (error) {
+                throw error
+            }
+            response.status(200).json(rows);
+        });
     });
 });
 
-//
-// Verwijder bestaande uitlening voor de
-// gegeven gebruiker van het exemplaar
-// met gegeven inventoryid.
-//
-routes.delete('/rentals/:userid/:inventoryid', function(req, res) {
 
-    var userid = req.params.id;
-    var inventoryid = req.params.id;
-    var query = {
-        sql: 'DELETE FROM `rental` WHERE userid=? AND inventoryid=?',
-        values: [userid, inventoryid],
-        timeout: 2000 // 2secs
-    };
+router.delete('/rentals/:customer_id', function(request, response, next) {
+    var customer_id = request.params.customer_id;
+    var query_str;
 
-    console.log('Onze query: ' + query.sql);
-
-    res.contentType('application/json');
-    db.query(query, function(error, rows, fields) {
-        if (error) {
-            res.status(401).json(error);
-        } else {
-            res.status(200).json({ result: rows });
-        };
-    });
+    if (customer_id > 0) {
+        query_str = 'DELETE FROM rental WHERE customer_id=' + customer_id +''
+        pool.getConnection(function (error, connection) {
+            if (error) {
+                throw error
+            }
+            connection.query(query_str, function (error, rows, fields) {
+                connection.release();
+                if (error) {
+                    throw error
+                }
+                response.status(200).json(rows);
+            });
+        });
+    } else {
+        next();
+        return;
+    }
 });
 
-module.exports = routes;
+module.exports = router;

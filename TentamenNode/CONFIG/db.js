@@ -1,5 +1,5 @@
 var mysql = require('mysql');
-var config = require('../config');
+var config = require('../CONFIG/config.json');
 
 var pool2 = mysql.createPool({
     multipleStatements:true,
