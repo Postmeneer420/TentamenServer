@@ -8,7 +8,7 @@ var app = express();
 app.use(bodyParser.urlencoded({ 'extended':'true'}))
 app.use(bodyParser.json());
 app.use(bodyParser.json({ type: 'application/vnd.api+json' }));
-
+-omo
 app.all('*', function(request, response, next){
     console.log(request.method + " " + request.url);
     next();
@@ -17,7 +17,7 @@ app.all('*', function(request, response, next){
 app.use('/api/v1', require('./API/film.routes.v1'));
 
 
-app.set('PORT', config.webPort);
+app.set('PORT', (process.env.PORT || config.webPort));
 
 app.get('/info', function(request, response) {
     response.send('Server tentamen Programmeren 4');
@@ -35,8 +35,8 @@ app.all('*', function(request, response) {
 // server starten
 var port = process.env.PORT || app.get('PORT');
 
-app.listen(port, function() {
-    console.log('Server app is listening on port ' + port);
+app.listen(app.get('PORT'), function() {
+    console.log('Server app is listening on port ' + app.get('PORT'));
 })
 
 
